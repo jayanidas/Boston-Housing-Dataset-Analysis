@@ -1,0 +1,188 @@
+---
+title: "Problem Set 6"
+author: "Jayani Das 701"
+date: "2026-03-13"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### To demonstrate the application of subset selection methods
+
+Consider the “Hitters” data. For loading the data you need to install ISLR
+library. We wish to predict a baseball player’s salary on the basis of various
+predictors. So first we need to choose an optimal model.
+
+```{r}
+#install.packages("ISLR")
+library(ISLR)
+data(Hitters)
+View(Hitters)
+head(Hitters)
+```
+1. Clean the data by removing all rows that have missing value in any variable. You will be working with this clean data.
+```{r}
+hitters <- na.omit(Hitters)
+dim(hitters)
+```
+2. Split the data randomly into train-test keeping 80% as training sample and remaining as test sample.
+```{r}
+set.seed(123)
+train_index <- sample(1:nrow(hitters), size = 0.8 * nrow(hitters))
+train_data <- hitters[train_index, ]; train_data
+test_data <- hitters[-train_index, ]; test_data
+```
+3. Perform the best subset selection on the training sample. While choosing the best model fit up to a 19 variable model. Choose the best model according to adjusted R squared, BIC , AIC and Cp values. In case the best model differs according to the selection criteria, report the best fitted model according to each selection criterion.
+```{r}
+#install.packages("leaps")
+library(leaps)
+best_subset <- regsubsets(Salary ~ ., data = train_data, nvmax = 19)
+summary_best_subset <- summary(best_subset); summary_best_subset
+
+# Best model according to adjusted R squared
+best_adj_r2 <- which.max(summary_best_subset$adjr2)
+# Best model according to BIC
+best_bic <- which.min(summary_best_subset$bic)
+# Best model according to AIC
+best_aic <- which.min(summary_best_subset$cp)
+best_adj_r2
+best_bic
+best_aic
+
+coefficients_adj_r2 <- coef(best_subset, best_adj_r2)
+coefficients_bic <- coef(best_subset, best_bic)
+coefficients_aic <- coef(best_subset, best_aic)
+cat("Best model according to Adjusted R-squared includes variables:", names(coefficients_adj_r2), "\n")
+cat("Best model according to BIC includes variables:", names(coefficients_bic), "\n")
+cat("Best model according to AIC includes variables:", names(coefficients_aic), "\n")
+```
+##### REPORT:
+- The best model according to Adjusted R-squared includes the following variables: (Intercept), AtBat, Hits, Walks, CAtBat, CHits, CWalks, LeagueN, DivisionW, NewLeagueN.
+
+- The best model according to BIC includes the following variables: (Intercept), AtBat, Hits, Walks, CAtBat, CHits, CWalks, LeagueN, DivisionW, NewLeagueN.
+
+- The best model according to AIC includes the following variables: (Intercept), AtBat, Hits, Walks, CAtBat, CHits, CWalks, LeagueN, DivisionW, NewLeagueN.
+
+
+4. Find the training MSE and test MSE for each of the best models selected according to different criterion as mentioned in 3 and compare their values.
+```{r}
+
+# Function to calculate MSE for regsubsets models
+calculate_mse <- function(model, data, id) {
+  # Extract coefficients for the chosen subset
+  coefi <- coef(model, id = id)
+  
+  # Build design matrix with the same variables
+  mat <- model.matrix(Salary ~ ., data)[, names(coefi)]
+  
+  # Predictions
+  predictions <- mat %*% coefi
+  
+  # MSE
+  mse <- mean((data$Salary - predictions)^2)
+  return(mse)
+}
+
+# Best model according to adjusted R squared
+model_adj_r2 <- regsubsets(Salary ~ ., data = train_data, nvmax = best_adj_r2)
+mse_train_adj_r2 <- calculate_mse(model_adj_r2, train_data, id = best_adj_r2)
+mse_test_adj_r2  <- calculate_mse(model_adj_r2, test_data, id = best_adj_r2)
+
+# Best model according to BIC
+model_bic <- regsubsets(Salary ~ ., data = train_data, nvmax = best_bic)
+mse_train_bic <- calculate_mse(model_bic, train_data, id = best_bic)
+mse_test_bic  <- calculate_mse(model_bic, test_data, id = best_bic)
+
+
+```
+5. Repeat 3-4 using forward stepwise selection method.
+```{r}
+# Forward stepwise selection
+forward_stepwise <- regsubsets(Salary ~ ., data = train_data, nvmax = 19, method = "forward")
+summary_forward_stepwise <- summary(forward_stepwise); summary_forward_stepwise
+
+# Best model according to adjusted R squared
+best_adj_r2_forward <- which.max(summary_forward_stepwise$adjr2)
+
+# Best model according to BIC
+best_bic_forward <- which.min(summary_forward_stepwise$bic)
+
+# Best model according to AIC
+best_aic_forward <- which.min(summary_forward_stepwise$cp)
+
+cat("Best model according to Adjusted R-squared (Forward):", names(coef(forward_stepwise, best_adj_r2_forward)), "\n")
+cat("Best model according to BIC (Forward):", names(coef(forward_stepwise, best_bic_forward)), "\n")
+cat("Best model according to AIC (Forward):", names(coef(forward_stepwise, best_aic_forward)), "\n")
+```
+6. Repeat 3-4 using backward stepwise selection method
+```{r}
+# Backward stepwise selection
+backward_stepwise <- regsubsets(Salary ~ ., data = train_data, nvmax = 19, method = "backward")
+summary_backward_stepwise <- summary(backward_stepwise)
+summary_backward_stepwise
+
+# Best model according to Adjusted R-squared
+best_adj_r2_backward <- which.max(summary_backward_stepwise$adjr2)
+
+# Best model according to BIC
+best_bic_backward <- which.min(summary_backward_stepwise$bic)
+
+# Best model according to AIC (using Mallows' Cp as proxy)
+best_aic_backward <- which.min(summary_backward_stepwise$cp)
+
+# Display selected variables for each criterion
+cat("Best model according to Adjusted R-squared (Backward):",
+    names(coef(backward_stepwise, id = best_adj_r2_backward)), "\n")
+
+cat("Best model according to BIC (Backward):",
+    names(coef(backward_stepwise, id = best_bic_backward)), "\n")
+
+cat("Best model according to AIC (Backward):",
+    names(coef(backward_stepwise, id = best_aic_backward)), "\n")
+
+
+```
+7. Compare the results of the three methods in terms of choice of best model, train MSE amd test MSE.
+```{r}
+# Function to calculate MSE for regsubsets models
+calculate_mse <- function(model, data, id) {
+  # Extract coefficients for the chosen subset
+  coefi <- coef(model, id = id)
+  
+  # Build design matrix with the same variables
+  mat <- model.matrix(Salary ~ ., data)[, names(coefi)]
+  
+  # Predictions
+  predictions <- mat %*% coefi
+  
+  # MSE
+  mse <- mean((data$Salary - predictions)^2)
+  return(mse)
+}
+
+# Identify best models from forward stepwise summary
+summary_forward_stepwise <- summary(forward_stepwise)
+best_forward_adj_r2 <- which.max(summary_forward_stepwise$adjr2)
+best_forward_bic    <- which.min(summary_forward_stepwise$bic)
+best_forward_aic    <- which.min(summary_forward_stepwise$cp)  # Cp as proxy for AIC
+
+# Compute MSEs
+mse_train_forward_adj_r2 <- calculate_mse(forward_stepwise, train_data, id = best_forward_adj_r2)
+mse_test_forward_adj_r2  <- calculate_mse(forward_stepwise, test_data, id = best_forward_adj_r2)
+
+mse_train_forward_bic <- calculate_mse(forward_stepwise, train_data, id = best_forward_bic)
+mse_test_forward_bic  <- calculate_mse(forward_stepwise, test_data, id = best_forward_bic)
+
+mse_train_forward_aic <- calculate_mse(forward_stepwise, train_data, id = best_forward_aic)
+mse_test_forward_aic  <- calculate_mse(forward_stepwise, test_data, id = best_forward_aic)
+
+# Print results
+cat("MSE for model selected by AIC (Forward): Train =", mse_train_forward_aic, "Test =", mse_test_forward_aic, "\n")
+cat("MSE for model selected by Adjusted R-squared (Forward): Train =", mse_train_forward_adj_r2, "Test =", mse_test_forward_adj_r2, "\n")
+cat("MSE for model selected by BIC (Forward): Train =", mse_train_forward_bic, "Test =", mse_test_forward_bic, "\n")
+
+
+```
+
